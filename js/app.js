@@ -91,6 +91,18 @@ function setFormError(text) {
   if (error) error.textContent = text;
 }
 
+function describeDataError(error) {
+  const code = error?.code || "";
+  const message = error?.message || "";
+  if (code === "permission-denied") {
+    return "La cuenta entró, pero Firestore rechazó los datos. Publicá las reglas de firebase/firestore.rules.";
+  }
+  if (code === "not-found" || code === "unavailable" || message.includes("NOT_FOUND")) {
+    return "La cuenta entró, pero Firestore no está creado. Creá la base en modo producción.";
+  }
+  return `La cuenta entró, pero no se pudieron leer los datos. ${message}`;
+}
+
 function scaleMarkup({ title, value, digits, zone, position, gradient, ticks, compact = false }) {
   return `
     <article class="scale ${compact ? "compact" : ""}">
@@ -458,10 +470,10 @@ function bindLogin() {
     }
     setFormError("");
     try {
-      const { signInWithGoogle } = await import("./auth.js");
+      const { describeAuthError, signInWithGoogle } = await import("./auth.js");
       await signInWithGoogle(state.auth);
     } catch (error) {
-      setFormError(`No se pudo abrir Google. ${error.message || ""}`);
+      setFormError(describeAuthError(error));
     }
   });
 }
@@ -887,14 +899,14 @@ async function boot() {
     render();
     return;
   }
-  const { completeRedirect, createFirebase, watchAuth } = await import("./auth.js");
+  const { completeRedirect, createFirebase, describeAuthError, watchAuth } = await import("./auth.js");
   const firebase = createFirebase();
   state.auth = firebase.auth;
   state.repo = await createRepository(firebase.db, firebase.auth);
   try {
     await completeRedirect(state.auth);
   } catch (error) {
-    state.message = `No se pudo entrar con Google. ${error.message || ""}`;
+    state.message = describeAuthError(error);
   }
   watchAuth(state.auth, (user) => {
     if (!user) {
@@ -908,7 +920,7 @@ async function boot() {
     }
     refresh().catch((error) => {
       state.screen = "login";
-      state.message = `No se pudieron leer tus datos. ${error.message || ""}`;
+      state.message = describeDataError(error);
       render();
     });
   });

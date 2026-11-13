@@ -4,7 +4,7 @@ import {
   getRedirectResult,
   GoogleAuthProvider,
   onAuthStateChanged,
-  signInWithRedirect,
+  signInWithPopup,
   signOut as firebaseSignOut,
 } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-auth.js";
 import { getFirestore } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js";
@@ -16,10 +16,31 @@ export function createFirebase() {
   return { auth: getAuth(app), db: getFirestore(app) };
 }
 
-export async function signInWithGoogle(auth) {
+export function googleProvider() {
   const provider = new GoogleAuthProvider();
   provider.setCustomParameters({ prompt: "select_account" });
-  await signInWithRedirect(auth, provider);
+  return provider;
+}
+
+export async function signInWithGoogle(auth) {
+  await signInWithPopup(auth, googleProvider());
+}
+
+export function describeAuthError(error) {
+  const code = error?.code || "";
+  if (code === "auth/unauthorized-domain") {
+    return "Este dominio no está autorizado en Firebase. En Authentication → Settings → Authorized domains tiene que estar el dominio de esta página.";
+  }
+  if (code === "auth/operation-not-allowed") {
+    return "El ingreso con Google no está activado. En Firebase: Authentication → Sign-in method → Google.";
+  }
+  if (code === "auth/popup-blocked") {
+    return "El navegador bloqueó la ventana de Google. Permití las ventanas emergentes para este sitio y volvé a intentar.";
+  }
+  if (code === "auth/popup-closed-by-user" || code === "auth/cancelled-popup-request") {
+    return "Se cerró la ventana de Google antes de terminar el ingreso.";
+  }
+  return `No se pudo entrar con Google. ${error?.message || "Probá de nuevo."}`;
 }
 
 export function completeRedirect(auth) {
