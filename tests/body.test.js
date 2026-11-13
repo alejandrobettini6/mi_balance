@@ -3,6 +3,8 @@ import test from "node:test";
 import {
   bmi,
   bmiZone,
+  idealMessage,
+  kgFromIdeal,
   markerPosition,
   parseDecimal,
   sanitizeDecimal,
@@ -19,6 +21,14 @@ test("el IMC usa los cortes de la OMS", () => {
   assert.match(bmiZone(27).hint, /Apenas/);
   assert.equal(bmiZone(27.1).hint, "");
   assert.equal(bmiZone(30).id, "obese");
+});
+
+test("el mensaje dice a cuántos kilos está del rango ideal", () => {
+  assert.equal(kgFromIdeal(70, 170), 0);
+  assert.equal(idealMessage(bmiZone(24.2), 70, 170), "Estás en tu rango ideal.");
+  assert.match(idealMessage(bmiZone(25.4), 73.5, 170), /Apenas en sobrepeso, a unos \d+ kg de tu ideal/);
+  assert.match(idealMessage(bmiZone(31), 90, 170), /Obesidad, a unos \d+ kg de tu ideal/);
+  assert.match(idealMessage(bmiZone(17), 50, 170), /por debajo de tu ideal/);
 });
 
 test("la relación cintura-altura marca el límite de la mitad", () => {

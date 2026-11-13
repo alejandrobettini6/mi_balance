@@ -6,6 +6,7 @@ import {
   bmi,
   bmiGradient,
   bmiZone,
+  idealMessage,
   formatDecimal,
   latestWaist,
   latestWeight,
@@ -35,6 +36,7 @@ import {
   formatDay,
   formatRange,
   nextEntries,
+  signedDelta,
   todayISO,
   weekStart,
   weekToReview,
@@ -44,7 +46,7 @@ import {
 
 const root = document.querySelector("#app");
 const params = new URLSearchParams(window.location.search);
-const previewMode = !isConfigured() && params.has("preview");
+const previewMode = params.has("preview") && (location.hostname === "localhost" || !isConfigured());
 const previewKind = params.get("preview") || "onboarding";
 
 const state = {
@@ -135,7 +137,7 @@ function profileScales(height, weight, waist, compact) {
       title: "Índice de masa corporal",
       value: bmiValue,
       digits: 1,
-      zone: bmiZone(bmiValue),
+      zone: { ...bmiZone(bmiValue), hint: idealMessage(bmiZone(bmiValue), weight, height) },
       position: markerPosition(bmiValue, BMI_MIN, BMI_MAX),
       gradient: bmiGradient(),
       ticks: ["Bajo peso", "Normal", "Sobrepeso", "Obesidad"],
@@ -249,28 +251,136 @@ function bannerHtml() {
   return `<div class="banner">${messages.map((message) => `<p>${message}</p>`).join("")}</div>`;
 }
 
+const DAY_LETTERS = { 0: "Do", 1: "Lu", 2: "Ma", 3: "Mi", 4: "Ju", 5: "Vi", 6: "Sá" };
+
+function signedText(delta, digits = 1) {
+  if (delta == null) return "";
+  if (delta === 0) return "0";
+  const sign = delta > 0 ? "+" : "−";
+  return `${sign}${formatDecimal(Math.abs(delta), digits)}`;
+}
+
+function journey() {
+  const list = weeks();
+  const weighed = list.filter((week) => week.average != null);
+  if (!weighed.length) return null;
+  const waists = list.filter((week) => week.waistCm != null);
+  return {
+    list,
+    first: weighed[0],
+    latest: weighed.at(-1),
+    total: weighed.length > 1 ? signedDelta(weighed.at(-1).average, weighed[0].average, 1) : null,
+    current: list.find((week) => week.inProgress) ?? weighed.at(-1),
+    latestWaist: waists.at(-1) ?? null,
+    waistTotal: waists.length > 1 ? signedDelta(waists.at(-1).waistCm, waists[0].waistCm, 1) : null,
+  };
+}
+
+function ringSvg(list) {
+  const weighed = list.filter((week) => week.average != null);
+  const radius = 46;
+  const turn = 2 * Math.PI * radius;
+  if (weighed.length < 2) {
+    return `<svg class="ring" viewBox="0 0 120 120" aria-hidden="true">
+      <circle cx="60" cy="60" r="${radius}" fill="none" stroke="#d9d1c6" stroke-width="11"/>
+    </svg>`;
+  }
+  const shown = weighed.slice(-12);
+  const count = shown.length;
+  const length = (turn / count) * 0.72;
+  const arcs = shown.map((week, index) => {
+    const way = direction(week.weightDelta);
+    const color = index === 0 && weighed.length <= 12 ? "#7ecfc8" : way === "up" ? "#c2542a" : way === "same" ? "#b7aea3" : "#0e6b66";
+    const offset = (turn * index) / count;
+    return `<circle cx="60" cy="60" r="${radius}" fill="none" stroke="${color}" stroke-width="11" stroke-dasharray="${length} ${turn - length}" stroke-dashoffset="${-offset}" transform="rotate(-90 60 60)"/>`;
+  }).join("");
+  return `<svg class="ring" viewBox="0 0 120 120" aria-hidden="true">${arcs}</svg>`;
+}
+
+function heroHtml() {
+  const story = journey();
+  if (!story) {
+    return `
+      <section class="hero">
+        <p class="eyebrow">Tu camino</p>
+        <h1>Todavía no hay un peso.</h1>
+        <p class="lede">Cuando lo cargues, acá vas a ver cuánto venís bajando.</p>
+      </section>`;
+  }
+  const way = direction(story.total) || "start";
+  const number = story.total == null ? formatDecimal(story.current.average, 1) : formatDecimal(Math.abs(story.total), 1);
+  const sign = story.total == null || story.total === 0 ? "" : story.total > 0 ? "+" : "−";
+  const label = story.total == null
+    ? "Promedio de esta semana"
+    : way === "down"
+      ? "Bajaste desde el inicio"
+      : way === "up"
+        ? "Subiste desde el inicio"
+        : "Igual que al inicio";
+  const weekLine = story.current?.average == null
+    ? "Esta semana todavía sin peso."
+    : story.current.weightDelta != null
+      ? `Esta semana ${signedText(story.current.weightDelta)} kg`
+      : `Esta semana ${formatDecimal(story.current.average, 1)} kg`;
+  const waistLine = story.latestWaist
+    ? `Cintura ${formatDecimal(story.latestWaist.waistCm, 1)} cm${story.waistTotal == null ? "" : ` · ${signedText(story.waistTotal)} cm`}`
+    : "";
+  const windowNote = story.list.filter((week) => week.average != null).length > 12
+    ? `<p class="fine">El anillo muestra las últimas 12 semanas.</p>`
+    : "";
+  return `
+    <section class="hero ${way}">
+      <div class="ring-wrap">
+        ${ringSvg(story.list)}
+        <div class="ring-center">
+          <h1>${sign}${number}</h1>
+          <small>kg</small>
+        </div>
+      </div>
+      <p class="hero-label">${label}</p>
+      <p class="meta">${weekLine}</p>
+      ${waistLine ? `<p class="meta">${waistLine}</p>` : ""}
+      ${windowNote}
+    </section>
+  `;
+}
+
+function dayStrip(selected) {
+  const start = weekStart(selected, state.profile?.week_starts_on ?? 1);
+  const today = todayISO();
+  const days = Array.from({ length: 7 }, (_, index) => {
+    const date = addDays(start, index);
+    const entry = entryOn(state.entries, date);
+    const classes = [
+      "day-dot",
+      date === selected ? "selected" : "",
+      entry?.weight_kg != null ? "has" : "",
+    ].filter(Boolean).join(" ");
+    const future = date > today;
+    return `<button type="button" class="${classes}" data-day="${date}" ${future ? "disabled" : ""} aria-pressed="${date === selected}" aria-label="${formatDay(date)}">
+      <span>${DAY_LETTERS[weekday(date)]}</span>
+      <strong>${Number(date.slice(8))}</strong>
+    </button>`;
+  }).join("");
+  return `<div class="day-strip" role="group" aria-label="${formatRange(start, addDays(start, 6))}">${days}</div>`;
+}
+
 function hoyHtml() {
   const today = todayISO();
   const existing = entryOn(state.entries, state.selectedDate);
-  const context = waistContext(state.selectedDate);
+  const week = weeks().find((item) => state.selectedDate >= item.start && state.selectedDate <= item.end) ?? null;
   const heading = state.selectedDate === today ? "Hoy" : formatDay(state.selectedDate);
-  const weekLine = context.week?.average != null
-    ? `<p class="meta">Esta semana: ${formatDecimal(context.week.average, 1)} kg · ${context.week.daysWeighed} de 7 días</p>`
-    : "";
-  const waistNote = !context.show && context.week?.waistCm != null
-    ? `<p class="meta">Cintura de esta semana: ${formatDecimal(context.week.waistCm, 1)} cm, el ${formatDay(context.week.waistDate)}. <button type="button" class="link" data-date="${context.week.waistDate}">Corregir</button></p>`
+  const waistElsewhere = week?.waistCm != null && week.waistDate !== state.selectedDate
+    ? `<p class="meta">Esta semana ya tiene ${formatDecimal(week.waistCm, 1)} cm, el ${formatDay(week.waistDate)}.</p>`
     : "";
   return `
     ${bannerHtml()}
     ${toast()}
-    <section class="panel">
-      <p class="eyebrow">${heading}</p>
-      <h1>¿Cuánto pesaste?</h1>
+    ${heroHtml()}
+    <section class="panel log">
+      <h2>${esc(heading)}</h2>
       <form id="day-form">
-        <label class="field">
-          <span>Día</span>
-          <input id="day" type="date" max="${today}" value="${state.selectedDate}" required>
-        </label>
+        ${dayStrip(state.selectedDate)}
         <label class="field">
           <span>Peso</span>
           <div class="measure">
@@ -278,19 +388,17 @@ function hoyHtml() {
             <span>kg</span>
           </div>
         </label>
-        ${context.show ? `
-          <label class="field">
-            <span>Cintura, si la mediste</span>
-            <div class="measure">
-              <input id="waist" inputmode="decimal" autocomplete="off" enterkeyhint="done" maxlength="6" value="${fieldValue(existing?.waist_cm)}">
-              <span>cm</span>
-            </div>
-          </label>` : waistNote}
+        <label class="field">
+          <span>Cintura, si la mediste</span>
+          <div class="measure small">
+            <input id="waist" inputmode="decimal" autocomplete="off" enterkeyhint="done" maxlength="6" value="${fieldValue(existing?.waist_cm)}">
+            <span>cm</span>
+          </div>
+        </label>
+        ${waistElsewhere}
         <p class="form-error" id="form-error"></p>
         <button type="submit" class="btn primary">Guardar</button>
-        ${existing ? `<button type="button" class="btn ghost" id="delete-day">Borrar este día</button>` : ""}
       </form>
-      ${weekLine}
     </section>
     <div id="scales">${profileScales(state.profile.height_cm, latestWeight(state.entries), latestWaist(state.entries), true)}</div>
   `;
@@ -310,8 +418,19 @@ function semanasHtml() {
         </div>
         ${week.inProgress ? `<span class="pill">En curso</span>` : ""}
       </header>
-      <p class="figure">${week.average == null ? "—" : formatDecimal(week.average, 1)} <small>kg</small></p>
-      <p class="meta">${week.daysWeighed} de 7 días ${deltaChip(week.weightDelta, "kg", week.weightComparedTo, week.number)}</p>
+      <div class="stats">
+        <div>
+          <span>Peso</span>
+          <strong>${week.average == null ? "—" : formatDecimal(week.average, 1)}</strong>
+          <em>kg ${deltaChip(week.weightDelta, "kg", week.weightComparedTo, week.number)}</em>
+        </div>
+        <div>
+          <span>Cintura</span>
+          <strong>${week.waistCm == null ? "—" : formatDecimal(week.waistCm, 1)}</strong>
+          <em>cm ${deltaChip(week.waistDelta, "cm", week.waistComparedTo, week.number)}</em>
+        </div>
+      </div>
+      <p class="meta">${week.daysWeighed} de 7 días${week.waistDate ? ` · cintura el ${formatDay(week.waistDate)}` : ""}</p>
       ${week.days.length
         ? `<ul class="day-list">${week.days.map((day) => `<li><button type="button" data-date="${day.date}">${formatDay(day.date)} · ${formatDecimal(day.weight, 1)} kg</button></li>`).join("")}</ul>`
         : `<p class="meta">Sin pesos esta semana.</p>`}
@@ -322,25 +441,13 @@ function semanasHtml() {
     <section class="panel">
       <h1>Semanas</h1>
       <p class="lede">El promedio de los días que te pesaste. La comparación es con la semana anterior, no entre días.</p>
-      ${trendBars(list)}
+      <h2 class="chart-title">Peso</h2>
+      ${chartBars(list, "weight")}
+      <h2 class="chart-title">Cintura</h2>
+      ${list.some((week) => week.waistCm != null) ? chartBars(list, "waist") : `<p class="meta">Cuando midas la cintura, el gráfico aparece acá.</p>`}
     </section>
     ${cards}
   `;
-}
-
-function cinturaHtml() {
-  const list = weeks();
-  if (!list.length) {
-    return `${toast()}<section class="panel"><h1>Cintura</h1><p class="lede">Una medición por semana, a la altura del ombligo.</p></section>`;
-  }
-  const cards = [...list].reverse().map((week) => `
-    <article class="card">
-      <p class="eyebrow">Semana ${week.number} · ${formatRange(week.start, week.end)}</p>
-      <p class="figure">${week.waistCm == null ? "—" : formatDecimal(week.waistCm, 1)} <small>cm</small></p>
-      <p class="meta">${week.waistDate ? formatDay(week.waistDate) : "Sin medición"} ${deltaChip(week.waistDelta, "cm", week.waistComparedTo, week.number)}</p>
-    </article>
-  `).join("");
-  return `${toast()}<section class="panel"><h1>Cintura</h1><p class="lede">Una vez por semana. Si la cargás de nuevo en la misma semana, reemplaza la anterior.</p></section>${cards}`;
 }
 
 function settingsHtml() {
@@ -393,15 +500,12 @@ function settingsHtml() {
 function shellHtml() {
   const view = state.view === "semanas"
     ? semanasHtml()
-    : state.view === "cintura"
-      ? cinturaHtml()
-      : state.view === "ajustes"
-        ? settingsHtml()
-        : hoyHtml();
+    : state.view === "ajustes"
+      ? settingsHtml()
+      : hoyHtml();
   const tabs = [
-    ["hoy", "Hoy"],
+    ["hoy", "Inicio"],
     ["semanas", "Semanas"],
-    ["cintura", "Cintura"],
     ["ajustes", "Ajustes"],
   ];
   return `
@@ -409,7 +513,6 @@ function shellHtml() {
       ${previewRibbon()}
       <header class="top">
         <p class="brand">Mi balance</p>
-        <p>${formatDay(todayISO())}</p>
       </header>
       <div id="view">${view}</div>
     </div>
@@ -423,26 +526,29 @@ function shellHtml() {
   `;
 }
 
-function trendBars(list) {
-  const values = list.map((week) => week.average).filter((value) => value != null);
+function chartBars(list, kind) {
+  const valueOf = (week) => (kind === "waist" ? week.waistCm : week.average);
+  const deltaOf = (week) => (kind === "waist" ? week.waistDelta : week.weightDelta);
+  const values = list.map(valueOf).filter((value) => value != null);
   if (!values.length) return "";
   const min = Math.min(...values);
   const max = Math.max(...values);
-  const pad = Math.max(0.4, (max - min) * 0.25);
+  const pad = Math.max(kind === "waist" ? 0.6 : 0.4, (max - min) * 0.25);
   const low = min - pad;
   const high = max + pad || low + 1;
-  return `<div class="bars" aria-hidden="true">${list.map((week) => {
-    const height = week.average == null ? 8 : 18 + ((week.average - low) / (high - low)) * 82;
-    const way = direction(week.weightDelta);
-    const tone = week.average == null ? "empty" : way === "up" ? "up" : "down";
-    return `<div class="bar-col"><span class="bar ${tone}" style="height:${height}%"></span><small>${week.number}</small></div>`;
+  const digits = kind === "waist" ? 0 : 1;
+  return `<div class="bars">${list.map((week) => {
+    const value = valueOf(week);
+    const height = value == null ? 8 : 18 + ((value - low) / (high - low)) * 82;
+    const way = direction(deltaOf(week));
+    const tone = value == null ? "empty" : way === "up" ? "up" : "down";
+    const reading = value == null ? "sin dato" : `${formatDecimal(value, digits)} ${kind === "waist" ? "cm" : "kg"}`;
+    return `<div class="bar-col" title="${esc(formatRange(week.start, week.end))} · ${reading}">
+      <small class="bar-read">${value == null ? "" : formatDecimal(value, digits)}</small>
+      <span class="bar-track"><span class="bar ${tone}" style="height:${height}%"></span></span>
+      <small>${formatDay(week.start)}</small>
+    </div>`;
   }).join("")}</div>`;
-}
-
-function waistContext(date) {
-  const week = weeks().find((item) => date >= item.start && date <= item.end) ?? null;
-  const show = !week || week.waistCm == null || week.waistDate === date;
-  return { week, show };
 }
 
 function paintScales(height, weight, waist, compact) {
@@ -538,7 +644,6 @@ function readingForScales() {
 function bindHoy() {
   const form = document.querySelector("#day-form");
   if (!form) return;
-  const day = document.querySelector("#day");
   const weight = document.querySelector("#weight");
   const waist = document.querySelector("#waist");
   bindDecimal(weight, 1);
@@ -549,8 +654,10 @@ function bindHoy() {
   };
   weight?.addEventListener("input", paint);
   waist?.addEventListener("input", paint);
-  day.addEventListener("change", () => {
-    state.selectedDate = day.value || todayISO();
+  form.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-day]");
+    if (!button || button.disabled) return;
+    state.selectedDate = button.dataset.day;
     state.message = "";
     render();
   });
@@ -558,11 +665,10 @@ function bindHoy() {
     event.preventDefault();
     saveDay();
   });
-  document.querySelector("#delete-day")?.addEventListener("click", deleteDay);
 }
 
 async function saveDay() {
-  const date = document.querySelector("#day").value;
+  const date = state.selectedDate;
   if (!date || date > todayISO()) {
     setFormError("Ese día todavía no llegó.");
     return;
@@ -613,19 +719,6 @@ async function saveDay() {
   } catch (error) {
     button.disabled = false;
     setFormError(`No se pudo guardar. ${error.message || ""}`);
-  }
-}
-
-async function deleteDay() {
-  const date = state.selectedDate;
-  const next = state.entries.filter((entry) => entry.entry_date !== date);
-  try {
-    await state.repo.saveEntries(next, state.entries);
-    state.entries = next;
-    state.message = "Día borrado.";
-    render();
-  } catch (error) {
-    setFormError(`No se pudo borrar. ${error.message || ""}`);
   }
 }
 
@@ -810,6 +903,22 @@ function applyLoaded(loaded) {
   route();
 }
 
+function startSeed() {
+  const today = todayISO();
+  const start = weekStart(today, 1);
+  return {
+    profile: {
+      height_cm: 172,
+      week_starts_on: 1,
+      reminder_time: "10:30",
+      waist_weekday: weekday(today),
+      onboarding_completed_at: "2026-11-01T12:00:00.000Z",
+      last_reviewed_week_start: start,
+    },
+    entries: [{ entry_date: today === start ? today : start, weight_kg: 80.4, waist_cm: 90 }],
+  };
+}
+
 function homeSeed() {
   const today = todayISO();
   const start = weekStart(today, 1);
@@ -897,7 +1006,7 @@ async function boot() {
     navigator.serviceWorker.register("./sw.js").catch(() => {});
   }
   if (previewMode) {
-    const initial = previewKind === "review" ? reviewSeed() : previewKind === "home" ? homeSeed() : {};
+    const initial = previewKind === "review" ? reviewSeed() : previewKind === "home" ? homeSeed() : previewKind === "start" ? startSeed() : {};
     state.repo = createMemoryRepository(initial);
     await refresh();
     return;
