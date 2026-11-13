@@ -1,10 +1,13 @@
-// Completá estos valores con la app web de Firebase.
-// Están en Configuración del proyecto → Tus apps. Son públicos: la seguridad está en las reglas.
+// Configuración pública de la app web de Firebase.
+// La seguridad está en las reglas de Firestore, no en ocultar estos valores.
 export const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_PROJECT.firebaseapp.com",
-  projectId: "YOUR_PROJECT",
-  appId: "YOUR_APP_ID",
+  apiKey: "AIzaSyBaC4J9nhsEvO2I4cTJGjWQbpBEruvCdRc",
+  authDomain: "mibalance-fd741.firebaseapp.com",
+  projectId: "mibalance-fd741",
+  storageBucket: "mibalance-fd741.firebasestorage.app",
+  messagingSenderId: "49402079682",
+  appId: "1:49402079682:web:5d11a7212443e45c5e8e5b",
+  measurementId: "G-2KH6D5BC7Z",
 };
 
 export function isConfigured() {
