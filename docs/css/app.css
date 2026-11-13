@@ -99,6 +99,37 @@ body {
   margin-top: 14px;
 }
 
+.calendar.collapsed {
+  margin-bottom: 0;
+}
+
+.btn.expand {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  margin-top: 8px;
+  background: transparent;
+  color: var(--teal);
+  font-size: 0.88rem;
+  font-weight: 650;
+  padding: 8px 10px;
+}
+
+.btn.expand::after {
+  content: "";
+  width: 0.45em;
+  height: 0.45em;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(45deg) translateY(-1px);
+}
+
+.btn.expand.open::after {
+  transform: rotate(-135deg) translateY(-1px);
+}
+
 .dow,
 .day {
   text-align: center;

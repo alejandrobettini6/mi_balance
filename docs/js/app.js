@@ -29,6 +29,7 @@
     logs: {},
     selected: todayISO(),
     viewMonth: startOfMonth(todayISO()),
+    monthOpen: false,
   };
 
   const els = {
@@ -51,6 +52,7 @@
     weekDots: document.querySelector("#week-dots"),
     prevMonth: document.querySelector("#prev-month"),
     nextMonth: document.querySelector("#next-month"),
+    toggleMonth: document.querySelector("#toggle-month"),
     reset: document.querySelector("#reset-demo"),
   };
 
@@ -261,25 +263,53 @@
     }
   }
 
+  function dayButton(iso, monthDate, today) {
+    const date = parseISO(iso);
+    const other = date.getMonth() !== monthDate.getMonth();
+    const classes = ["day"];
+    if (other) classes.push("other");
+    if (iso === state.selected) classes.push("selected");
+    if (state.logs[iso]?.peso != null) classes.push("has");
+    const disabled = iso > today ? "disabled" : "";
+    return `<button type="button" class="${classes.join(" ")}" data-day="${iso}" ${disabled} aria-pressed="${iso === state.selected}">${date.getDate()}</button>`;
+  }
+
   function renderCalendar() {
     const monthDate = parseISO(state.viewMonth);
-    els.monthLabel.textContent = `${MONTHS[monthDate.getMonth()]} ${monthDate.getFullYear()}`;
-    const first = state.viewMonth;
-    const gridStart = startOfWeek(first);
     const today = todayISO();
-    const cells = [`<span class="dow">Lu</span>`, `<span class="dow">Ma</span>`, `<span class="dow">Mi</span>`, `<span class="dow">Ju</span>`, `<span class="dow">Vi</span>`, `<span class="dow">Sá</span>`, `<span class="dow">Do</span>`];
+    const headers = [
+      `<span class="dow">Lu</span>`,
+      `<span class="dow">Ma</span>`,
+      `<span class="dow">Mi</span>`,
+      `<span class="dow">Ju</span>`,
+      `<span class="dow">Vi</span>`,
+      `<span class="dow">Sá</span>`,
+      `<span class="dow">Do</span>`,
+    ];
+    els.calendar.classList.toggle("collapsed", !state.monthOpen);
+    els.toggleMonth.setAttribute("aria-expanded", String(state.monthOpen));
+    els.toggleMonth.classList.toggle("open", state.monthOpen);
+    els.toggleMonth.textContent = state.monthOpen ? "Ver semana" : "Ver mes";
+
+    if (!state.monthOpen) {
+      const monday = startOfWeek(state.selected);
+      const sunday = addDays(monday, 6);
+      els.monthLabel.textContent = formatRange(monday, sunday);
+      els.prevMonth.setAttribute("aria-label", "Semana anterior");
+      els.nextMonth.setAttribute("aria-label", "Semana siguiente");
+      els.calendar.innerHTML = headers.concat(
+        weekDays(monday).map((iso) => dayButton(iso, monthDate, today)),
+      ).join("");
+      return;
+    }
+
+    els.monthLabel.textContent = `${MONTHS[monthDate.getMonth()]} ${monthDate.getFullYear()}`;
+    els.prevMonth.setAttribute("aria-label", "Mes anterior");
+    els.nextMonth.setAttribute("aria-label", "Mes siguiente");
+    const gridStart = startOfWeek(state.viewMonth);
+    const cells = [...headers];
     for (let i = 0; i < 42; i += 1) {
-      const iso = addDays(gridStart, i);
-      const date = parseISO(iso);
-      const other = date.getMonth() !== monthDate.getMonth();
-      const classes = ["day"];
-      if (other) classes.push("other");
-      if (iso === state.selected) classes.push("selected");
-      if (state.logs[iso]?.peso != null) classes.push("has");
-      const disabled = iso > today ? "disabled" : "";
-      cells.push(
-        `<button type="button" class="${classes.join(" ")}" data-day="${iso}" ${disabled} aria-pressed="${iso === state.selected}">${date.getDate()}</button>`,
-      );
+      cells.push(dayButton(addDays(gridStart, i), monthDate, today));
     }
     els.calendar.innerHTML = cells.join("");
   }
@@ -423,11 +453,27 @@
       selectDay(button.dataset.day);
     });
     els.prevMonth.addEventListener("click", () => {
-      state.viewMonth = addMonths(state.viewMonth, -1);
-      renderCalendar();
+      if (state.monthOpen) {
+        state.viewMonth = addMonths(state.viewMonth, -1);
+        renderCalendar();
+        return;
+      }
+      const next = addDays(state.selected, -7);
+      selectDay(next);
     });
     els.nextMonth.addEventListener("click", () => {
-      state.viewMonth = addMonths(state.viewMonth, 1);
+      if (state.monthOpen) {
+        state.viewMonth = addMonths(state.viewMonth, 1);
+        renderCalendar();
+        return;
+      }
+      const next = addDays(state.selected, 7);
+      if (startOfWeek(next) > startOfWeek(todayISO())) return;
+      selectDay(next > todayISO() ? todayISO() : next);
+    });
+    els.toggleMonth.addEventListener("click", () => {
+      state.monthOpen = !state.monthOpen;
+      state.viewMonth = startOfMonth(state.selected);
       renderCalendar();
     });
     els.reset.addEventListener("click", () => {
@@ -436,6 +482,7 @@
       saveLogs();
       state.selected = todayISO();
       state.viewMonth = startOfMonth(state.selected);
+      state.monthOpen = false;
       render();
     });
     render();

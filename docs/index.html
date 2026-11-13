@@ -21,11 +21,14 @@
 
       <section class="panel" aria-labelledby="log-title">
         <div class="cal-nav">
-          <button type="button" id="prev-month" aria-label="Mes anterior">‹</button>
+          <button type="button" id="prev-month" aria-label="Anterior">‹</button>
           <h2 id="month-label"></h2>
-          <button type="button" id="next-month" aria-label="Mes siguiente">›</button>
+          <button type="button" id="next-month" aria-label="Siguiente">›</button>
         </div>
         <div id="calendar" class="calendar" role="grid" aria-label="Calendario"></div>
+        <button type="button" class="btn expand" id="toggle-month" aria-expanded="false">
+          Ver mes
+        </button>
         <p class="selected-day" id="selected-label"></p>
 
         <form id="day-form">
