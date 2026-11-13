@@ -31,7 +31,7 @@ Esos valores son públicos. No hace falta una clave de administrador en el sitio
 
 En el repositorio, **Settings → Pages → Deploy from a branch**. Rama publicada y carpeta `/ (root)`.
 
-La dirección va a ser `https://<usuario>.github.io/mi_balance/`. Agregala como dominio autorizado en Firebase antes de probar **Continuar con Google**.
+La dirección es [https://alejandrobettini6.github.io/mi_balance/](https://alejandrobettini6.github.io/mi_balance/). `alejandrobettini6.github.io` tiene que estar en los dominios autorizados de Firebase antes de probar **Continuar con Google**.
 
 ## Qué hace la app
 
