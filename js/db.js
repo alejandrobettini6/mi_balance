@@ -1,3 +1,5 @@
+const FIRESTORE = "https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js";
+
 const PROFILE_FIELDS = [
   "height_cm",
   "week_starts_on",
@@ -6,6 +8,15 @@ const PROFILE_FIELDS = [
   "onboarding_completed_at",
   "last_reviewed_week_start",
 ];
+
+const EMPTY_PROFILE = {
+  height_cm: null,
+  week_starts_on: 1,
+  reminder_time: "10:30",
+  waist_weekday: null,
+  onboarding_completed_at: null,
+  last_reviewed_week_start: null,
+};
 
 export function normalizeProfile(row) {
   if (!row) return null;
@@ -35,89 +46,79 @@ function profilePatch(patch) {
   return next;
 }
 
-export function createRepository(supabase) {
+export async function createRepository(db, auth) {
+  const { collection, doc, getDoc, getDocs, setDoc, writeBatch } = await import(FIRESTORE);
+
+  function currentUser() {
+    const user = auth.currentUser;
+    if (!user) throw new Error("No hay sesión.");
+    return user;
+  }
+
+  function profileRef(uid) {
+    return doc(db, "users", uid);
+  }
+
+  function entryRef(uid, date) {
+    return doc(db, "users", uid, "entries", date);
+  }
+
   return {
     async load() {
-      const { data: userData, error: userError } = await supabase.auth.getUser();
-      if (userError) throw userError;
-      const user = userData.user;
+      const user = auth.currentUser;
       if (!user) return { user: null, profile: null, entries: [] };
 
-      let { data: profile, error: profileError } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", user.id)
-        .maybeSingle();
-      if (profileError) throw profileError;
-
+      const profileSnap = await getDoc(profileRef(user.uid));
+      let profile = profileSnap.exists() ? profileSnap.data() : null;
       if (!profile) {
-        const inserted = await supabase.from("profiles").insert({ id: user.id }).select("*").single();
-        if (inserted.error) throw inserted.error;
-        profile = inserted.data;
+        profile = { ...EMPTY_PROFILE };
+        await setDoc(profileRef(user.uid), profile);
       }
 
-      const { data: entries, error: entriesError } = await supabase
-        .from("entries")
-        .select("entry_date, weight_kg, waist_cm")
-        .eq("user_id", user.id)
-        .order("entry_date", { ascending: true });
-      if (entriesError) throw entriesError;
+      const entriesSnap = await getDocs(collection(db, "users", user.uid, "entries"));
+      const entries = entriesSnap.docs
+        .map((item) => mapEntry({ entry_date: item.id, ...item.data() }))
+        .sort((a, b) => a.entry_date.localeCompare(b.entry_date));
 
       return {
-        user,
+        user: { id: user.uid, email: user.email || "" },
         profile: normalizeProfile(profile),
-        entries: (entries ?? []).map(mapEntry),
+        entries,
       };
     },
 
     async saveProfile(patch) {
-      const { data: userData, error: userError } = await supabase.auth.getUser();
-      if (userError) throw userError;
-      const { data, error } = await supabase
-        .from("profiles")
-        .update(profilePatch(patch))
-        .eq("id", userData.user.id)
-        .select("*")
-        .single();
-      if (error) throw error;
-      return normalizeProfile(data);
+      const user = currentUser();
+      const ref = profileRef(user.uid);
+      await setDoc(ref, profilePatch(patch), { merge: true });
+      const snap = await getDoc(ref);
+      return normalizeProfile(snap.data());
     },
 
     async saveEntries(next, previous) {
-      const { data: userData, error: userError } = await supabase.auth.getUser();
-      if (userError) throw userError;
-      const userId = userData.user.id;
+      const user = currentUser();
       const before = new Map(previous.map((entry) => [entry.entry_date, entry]));
       const after = new Map(next.map((entry) => [entry.entry_date, entry]));
-      const toDelete = [];
-      const toUpsert = [];
+      const batch = writeBatch(db);
+      let pending = 0;
 
       for (const date of before.keys()) {
-        if (!after.has(date)) toDelete.push(date);
+        if (!after.has(date)) {
+          batch.delete(entryRef(user.uid, date));
+          pending += 1;
+        }
       }
       for (const [date, row] of after) {
         const old = before.get(date);
         if (!old || old.weight_kg !== row.weight_kg || old.waist_cm !== row.waist_cm) {
-          toUpsert.push(row);
-        }
-      }
-
-      if (toDelete.length) {
-        const { error } = await supabase.from("entries").delete().eq("user_id", userId).in("entry_date", toDelete);
-        if (error) throw error;
-      }
-      if (toUpsert.length) {
-        const { error } = await supabase.from("entries").upsert(
-          toUpsert.map((row) => ({
-            user_id: userId,
-            entry_date: row.entry_date,
+          batch.set(entryRef(user.uid, date), {
             weight_kg: row.weight_kg,
             waist_cm: row.waist_cm,
-          })),
-          { onConflict: "user_id,entry_date" },
-        );
-        if (error) throw error;
+          });
+          pending += 1;
+        }
       }
+      if (pending) await batch.commit();
     },
   };
 }
@@ -126,12 +127,7 @@ export function createMemoryRepository(initial = {}) {
   const state = {
     user: { id: "preview", email: "vista previa" },
     profile: normalizeProfile({
-      height_cm: null,
-      week_starts_on: 1,
-      reminder_time: "10:30",
-      waist_weekday: null,
-      onboarding_completed_at: null,
-      last_reviewed_week_start: null,
+      ...EMPTY_PROFILE,
       ...initial.profile,
     }),
     entries: (initial.entries ?? []).map(mapEntry),

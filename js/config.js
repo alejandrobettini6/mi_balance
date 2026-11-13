@@ -1,16 +1,17 @@
-// Completá estos dos valores con el proyecto de Supabase.
-// La clave anónima es pública: la seguridad está en las políticas de fila.
-// No pongas acá la clave service_role.
-export const supabaseUrl = "https://YOUR_PROJECT.supabase.co";
-export const supabaseAnonKey = "YOUR_ANON_KEY";
+// Completá estos valores con la app web de Firebase.
+// Están en Configuración del proyecto → Tus apps. Son públicos: la seguridad está en las reglas.
+export const firebaseConfig = {
+  apiKey: "YOUR_API_KEY",
+  authDomain: "YOUR_PROJECT.firebaseapp.com",
+  projectId: "YOUR_PROJECT",
+  appId: "YOUR_APP_ID",
+};
 
 export function isConfigured() {
-  return (
-    typeof supabaseUrl === "string" &&
-    supabaseUrl.startsWith("https://") &&
-    !supabaseUrl.includes("YOUR_PROJECT") &&
-    typeof supabaseAnonKey === "string" &&
-    supabaseAnonKey.length > 20 &&
-    !supabaseAnonKey.includes("YOUR_ANON_KEY")
-  );
+  const { apiKey, authDomain, projectId, appId } = firebaseConfig;
+  return [apiKey, authDomain, projectId, appId].every((value) => typeof value === "string" && value.length > 0)
+    && !apiKey.includes("YOUR_API_KEY")
+    && !authDomain.includes("YOUR_PROJECT")
+    && !projectId.includes("YOUR_PROJECT")
+    && !appId.includes("YOUR_APP_ID");
 }

@@ -1,0 +1,26 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+
+      match /entries/{entryId} {
+        allow read, delete: if request.auth != null && request.auth.uid == userId;
+        allow create, update: if request.auth != null
+          && request.auth.uid == userId
+          && entryId.matches('\\d{4}-\\d{2}-\\d{2}')
+          && request.resource.data.keys().hasOnly(['weight_kg', 'waist_cm'])
+          && (request.resource.data.weight_kg == null
+            || (request.resource.data.weight_kg is number
+              && request.resource.data.weight_kg > 0
+              && request.resource.data.weight_kg < 500))
+          && (request.resource.data.waist_cm == null
+            || (request.resource.data.waist_cm is number
+              && request.resource.data.waist_cm > 0
+              && request.resource.data.waist_cm < 300))
+          && (request.resource.data.weight_kg is number
+            || request.resource.data.waist_cm is number);
+      }
+    }
+  }
+}

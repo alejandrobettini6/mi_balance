@@ -2,43 +2,36 @@
 
 Registro de peso y cintura. El promedio de cada semana muestra si bajaste o subiste, sin comparar un día contra el otro.
 
-Es una página estática. La cuenta entra con Google y los datos quedan en Supabase, cada persona con lo suyo.
+Es una página estática. La cuenta entra con Google y los datos quedan en Firestore, cada persona con lo suyo.
 
-## 1. Base de datos
+Los datos son de una sola persona: un perfil y un día por fecha. No hay relaciones entre usuarios ni consultas que crucen tablas, así que Firestore encaja mejor que una base relacional.
 
-En el proyecto de Supabase, abrí **SQL Editor**, pegá el contenido de [`supabase/schema.sql`](supabase/schema.sql) y ejecutalo una vez.
+## 1. Firebase
 
-Eso crea:
+1. Creá un proyecto en [Firebase](https://console.firebase.google.com/).
+2. **Authentication → Sign-in method → Google**, y activalo.
+3. **Authentication → Settings → Authorized domains**: agregá el dominio de GitHub Pages, por ejemplo `<usuario>.github.io`. `localhost` ya viene habilitado.
+4. **Firestore Database → Create database**. Elegí el modo de producción.
+5. En **Firestore → Rules**, pegá [`firebase/firestore.rules`](firebase/firestore.rules) y publicalo.
 
-- `profiles`: altura, día en que empieza la semana, horario del recordatorio, día de la cintura y qué semana ya se mostró al abrir la app.
-- `entries`: un peso y, si se midió, una cintura por fecha.
-- El perfil vacío apenas alguien se registra con Google.
-- Las políticas para que cada usuario lea y escriba solo sus filas.
+Eso deja dos lugares por usuario:
 
-La cintura es una por semana. Si se carga otra en la misma semana, la app reemplaza la anterior. El corte de la semana depende del día elegido en Ajustes, así que esa regla vive en la app y no en una restricción de la tabla.
+- `users/{uid}`: altura, día en que empieza la semana, horario del recordatorio, día de la cintura y qué semana ya se mostró.
+- `users/{uid}/entries/{fecha}`: el peso y, si se midió, la cintura de ese día. La fecha es el id, por ejemplo `2026-11-12`.
 
-## 2. Google
+Cada usuario solo lee y escribe su carpeta. La cintura sigue siendo una por semana: si se carga otra en la misma semana, la app reemplaza la anterior.
 
-1. En [Google Cloud](https://console.cloud.google.com/), creá un cliente OAuth de tipo **Aplicación web**.
-2. En **URI de redireccionamiento autorizados** poné `https://<referencia>.supabase.co/auth/v1/callback`.
-3. En Supabase, **Authentication → Providers → Google**, pegá el client id y el client secret.
-4. En **Authentication → URL Configuration**:
-   - **Site URL**: la dirección de GitHub Pages, por ejemplo `https://<usuario>.github.io/mi_balance/`.
-   - **Redirect URLs**: esa misma dirección y, si vas a probar en tu máquina, `http://127.0.0.1:4173/`.
+## 2. Claves
 
-Tiene que coincidir exactamente con la dirección desde la que se abre la app, incluida la barra final.
+En **Configuración del proyecto → Tus apps**, creá una app web y copiá la configuración a [`js/config.js`](js/config.js): `apiKey`, `authDomain`, `projectId` y `appId`.
 
-## 3. Claves
+Esos valores son públicos. No hace falta una clave de administrador en el sitio.
 
-En [`js/config.js`](js/config.js) completá la URL del proyecto y la clave **anon**.
+## 3. GitHub Pages
 
-Esa clave es pública: va en el sitio. No pongas la clave `service_role`.
+En el repositorio, **Settings → Pages → Deploy from a branch**. Rama publicada y carpeta `/ (root)`.
 
-## 4. GitHub Pages
-
-En el repositorio, **Settings → Pages → Deploy from a branch**. Rama `main` (o la rama que publiques) y carpeta `/ (root)`.
-
-La dirección va a ser `https://<usuario>.github.io/mi_balance/`. Agregala en Supabase, como en el paso 2, antes de probar **Continuar con Google**.
+La dirección va a ser `https://<usuario>.github.io/mi_balance/`. Agregala como dominio autorizado en Firebase antes de probar **Continuar con Google**.
 
 ## Qué hace la app
 

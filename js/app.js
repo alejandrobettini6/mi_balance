@@ -55,7 +55,7 @@ const state = {
   entries: [],
   selectedDate: todayISO(),
   message: "",
-  supabase: null,
+  auth: null,
   repo: null,
   review: null,
   stopReminder: () => {},
@@ -169,7 +169,7 @@ function loginHtml() {
   const setup = isConfigured()
     ? ""
     : `<div class="setup">
-        <p>Para entrar con Google, completá la URL y la clave anónima en <code>js/config.js</code>. El SQL está en <code>supabase/schema.sql</code>.</p>
+        <p>Para entrar con Google, completá la configuración de Firebase en <code>js/config.js</code>. Las reglas están en <code>firebase/firestore.rules</code>.</p>
         <p><a href="?preview=1">Ver el formulario</a> · <a href="?preview=home">Ver una semana</a> · <a href="?preview=review">Ver el cierre</a></p>
       </div>`;
   return `
@@ -452,14 +452,14 @@ function bindDecimal(input, digits = 1) {
 
 function bindLogin() {
   document.querySelector("#google").addEventListener("click", async () => {
-    if (!isConfigured() || !state.supabase) {
-      setFormError("Falta la URL y la clave anónima en js/config.js.");
+    if (!isConfigured() || !state.auth) {
+      setFormError("Falta la configuración de Firebase en js/config.js.");
       return;
     }
     setFormError("");
     try {
       const { signInWithGoogle } = await import("./auth.js");
-      await signInWithGoogle(state.supabase);
+      await signInWithGoogle(state.auth);
     } catch (error) {
       setFormError(`No se pudo abrir Google. ${error.message || ""}`);
     }
@@ -701,13 +701,13 @@ function exportData() {
 
 async function logout() {
   state.stopReminder();
-  if (previewMode || !state.supabase) {
+  if (previewMode || !state.auth) {
     window.location.href = "./";
     return;
   }
   try {
     const { signOut } = await import("./auth.js");
-    await signOut(state.supabase);
+    await signOut(state.auth);
   } catch (error) {
     state.message = `No se pudo cerrar la sesión. ${error.message || ""}`;
     render();
@@ -887,28 +887,30 @@ async function boot() {
     render();
     return;
   }
-  const { createSupabase } = await import("./auth.js");
-  state.supabase = createSupabase();
-  state.repo = createRepository(state.supabase);
-  state.supabase.auth.onAuthStateChange((_event, session) => {
-    window.setTimeout(async () => {
-      if (!session) {
-        state.stopReminder();
-        state.user = null;
-        state.profile = null;
-        state.entries = [];
-        state.screen = "login";
-        render();
-        return;
-      }
-      try {
-        await refresh();
-      } catch (error) {
-        state.screen = "login";
-        state.message = `No se pudieron leer tus datos. ${error.message || ""}`;
-        render();
-      }
-    }, 0);
+  const { completeRedirect, createFirebase, watchAuth } = await import("./auth.js");
+  const firebase = createFirebase();
+  state.auth = firebase.auth;
+  state.repo = await createRepository(firebase.db, firebase.auth);
+  try {
+    await completeRedirect(state.auth);
+  } catch (error) {
+    state.message = `No se pudo entrar con Google. ${error.message || ""}`;
+  }
+  watchAuth(state.auth, (user) => {
+    if (!user) {
+      state.stopReminder();
+      state.user = null;
+      state.profile = null;
+      state.entries = [];
+      state.screen = "login";
+      render();
+      return;
+    }
+    refresh().catch((error) => {
+      state.screen = "login";
+      state.message = `No se pudieron leer tus datos. ${error.message || ""}`;
+      render();
+    });
   });
 }
 
