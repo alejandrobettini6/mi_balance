@@ -52,7 +52,7 @@ Mientras `js/config.js` tenga los valores de ejemplo:
 - `?preview=home` muestra una semana de ejemplo.
 - `?preview=review` muestra el cierre de semana.
 
-Esos datos no salen del navegador y desaparecen al recargar. Cuando las claves están cargadas, la vista previa no se usa.
+Esos datos no salen del navegador y desaparecen al recargar. En el sitio publicado, la vista previa no se usa. En `localhost`, `?preview=home` sigue disponible para mirar la pantalla con datos de ejemplo.
 
 ## Pruebas
 

@@ -84,12 +84,12 @@ function stop(value, min, max) {
 
 export function bmiGradient() {
   const at = (value) => stop(value, BMI_MIN, BMI_MAX);
-  return `linear-gradient(90deg, #6d7c8a 0%, #8ea0ae ${at(18.5)}%, #2f9e72 ${at(21.5)}%, #1f8a62 ${at(24.5)}%, #e0a106 ${at(27)}%, #d06a2b ${at(30)}%, #c63b2f ${at(35)}%, #c63b2f 100%)`;
+  return `linear-gradient(90deg, #5b6d7d 0%, #7f93a3 ${at(18.5)}%, #3ecf8e ${at(20)}%, #149a62 ${at(22.5)}%, #178a52 ${at(24.5)}%, #f0b429 ${at(26)}%, #f08a24 ${at(28.5)}%, #e15a32 ${at(30)}%, #d23b3b ${at(34)}%, #b4232c 100%)`;
 }
 
 export function whtrGradient() {
   const at = (value) => stop(value, WHTR_MIN, WHTR_MAX);
-  return `linear-gradient(90deg, #6d7c8a 0%, #8ea0ae ${at(0.4)}%, #2f9e72 ${at(0.45)}%, #1f8a62 ${at(0.49)}%, #e0a106 ${at(0.53)}%, #d06a2b ${at(0.6)}%, #c63b2f ${at(0.68)}%, #c63b2f 100%)`;
+  return `linear-gradient(90deg, #5b6d7d 0%, #7f93a3 ${at(0.4)}%, #3ecf8e ${at(0.43)}%, #149a62 ${at(0.47)}%, #178a52 ${at(0.49)}%, #f0b429 ${at(0.53)}%, #f08a24 ${at(0.57)}%, #e15a32 ${at(0.6)}%, #d23b3b ${at(0.68)}%, #b4232c 100%)`;
 }
 
 export function latestWeight(entries) {
