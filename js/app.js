@@ -469,11 +469,13 @@ function bindLogin() {
       return;
     }
     setFormError("");
+    let describe = (error) => error?.message || "No se pudo entrar con Google.";
     try {
-      const { describeAuthError, signInWithGoogle } = await import("./auth.js");
-      await signInWithGoogle(state.auth);
+      const auth = await import("./auth.js");
+      describe = auth.describeAuthError;
+      await auth.signInWithGoogle(state.auth);
     } catch (error) {
-      setFormError(describeAuthError(error));
+      setFormError(describe(error));
     }
   });
 }
@@ -885,6 +887,12 @@ async function refresh() {
 }
 
 async function boot() {
+  if (location.hostname === "127.0.0.1") {
+    const url = new URL(location.href);
+    url.hostname = "localhost";
+    location.replace(url);
+    return;
+  }
   if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("./sw.js").catch(() => {});
   }
