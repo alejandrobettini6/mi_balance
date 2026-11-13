@@ -6,6 +6,7 @@ import {
   bmi,
   bmiGradient,
   bmiZone,
+  idealMessage,
   formatDecimal,
   latestWaist,
   latestWeight,
@@ -136,7 +137,7 @@ function profileScales(height, weight, waist, compact) {
       title: "Índice de masa corporal",
       value: bmiValue,
       digits: 1,
-      zone: bmiZone(bmiValue),
+      zone: { ...bmiZone(bmiValue), hint: idealMessage(bmiZone(bmiValue), weight, height) },
       position: markerPosition(bmiValue, BMI_MIN, BMI_MAX),
       gradient: bmiGradient(),
       ticks: ["Bajo peso", "Normal", "Sobrepeso", "Obesidad"],
@@ -280,12 +281,8 @@ function ringSvg(list) {
   const radius = 46;
   const turn = 2 * Math.PI * radius;
   if (weighed.length < 2) {
-    const current = list.find((week) => week.inProgress) ?? weighed[0];
-    const portion = Math.max(0.08, (current?.daysWeighed ?? 0) / 7);
-    const length = turn * portion;
     return `<svg class="ring" viewBox="0 0 120 120" aria-hidden="true">
-      <circle cx="60" cy="60" r="${radius}" fill="none" stroke="#e7e1d6" stroke-width="11"/>
-      <circle cx="60" cy="60" r="${radius}" fill="none" stroke="#0e6b66" stroke-width="11" stroke-linecap="round" stroke-dasharray="${length} ${turn - length}" transform="rotate(-90 60 60)"/>
+      <circle cx="60" cy="60" r="${radius}" fill="none" stroke="#d9d1c6" stroke-width="11"/>
     </svg>`;
   }
   const shown = weighed.slice(-12);
@@ -336,7 +333,8 @@ function heroHtml() {
       <div class="ring-wrap">
         ${ringSvg(story.list)}
         <div class="ring-center">
-          <h1>${sign}${number}<small>kg</small></h1>
+          <h1>${sign}${number}</h1>
+          <small>kg</small>
         </div>
       </div>
       <p class="hero-label">${label}</p>
@@ -905,6 +903,22 @@ function applyLoaded(loaded) {
   route();
 }
 
+function startSeed() {
+  const today = todayISO();
+  const start = weekStart(today, 1);
+  return {
+    profile: {
+      height_cm: 172,
+      week_starts_on: 1,
+      reminder_time: "10:30",
+      waist_weekday: weekday(today),
+      onboarding_completed_at: "2026-11-01T12:00:00.000Z",
+      last_reviewed_week_start: start,
+    },
+    entries: [{ entry_date: today === start ? today : start, weight_kg: 80.4, waist_cm: 90 }],
+  };
+}
+
 function homeSeed() {
   const today = todayISO();
   const start = weekStart(today, 1);
@@ -992,7 +1006,7 @@ async function boot() {
     navigator.serviceWorker.register("./sw.js").catch(() => {});
   }
   if (previewMode) {
-    const initial = previewKind === "review" ? reviewSeed() : previewKind === "home" ? homeSeed() : {};
+    const initial = previewKind === "review" ? reviewSeed() : previewKind === "home" ? homeSeed() : previewKind === "start" ? startSeed() : {};
     state.repo = createMemoryRepository(initial);
     await refresh();
     return;

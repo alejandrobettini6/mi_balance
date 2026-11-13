@@ -536,18 +536,28 @@ code {
     var(--card);
 }
 
+.hero.start { background: var(--card); }
+
 .hero h1 {
   margin: 0;
   font-size: clamp(42px, 12vw, 56px);
   line-height: 0.9;
 }
 
-.hero.down h1 { color: var(--teal); }
-.hero.up h1 { color: var(--clay); }
+.hero.down .ring-center h1 { color: var(--teal); }
+.hero.up .ring-center h1 { color: var(--clay); }
 
-.hero h1 small {
-  margin-left: 4px;
-  font-size: 0.38em;
+.hero .ring-center h1 {
+  font-size: 26px;
+  line-height: 1;
+  letter-spacing: -0.04em;
+}
+
+.hero .ring-center small {
+  display: block;
+  margin: 2px 0 0;
+  font-size: 12px;
+  font-weight: 650;
   color: var(--muted);
   letter-spacing: 0;
 }
@@ -571,10 +581,12 @@ code {
 
 .ring-center {
   position: absolute;
-  inset: 18%;
+  inset: 24%;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  text-align: center;
 }
 
 .log { margin-top: 12px; }

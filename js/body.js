@@ -51,6 +51,33 @@ export function markerPosition(value, min, max) {
   return Math.min(1, Math.max(0, (value - min) / (max - min)));
 }
 
+export function kgFromIdeal(weightKg, heightCm) {
+  if (weightKg == null || heightCm == null || heightCm <= 0) return null;
+  const meters = heightCm / 100;
+  const at = (index) => index * meters * meters;
+  const low = at(18.5);
+  const high = at(24.9);
+  if (weightKg < low) return roundTo(weightKg - low, 1);
+  if (weightKg > high) return roundTo(weightKg - high, 1);
+  return 0;
+}
+
+export function idealMessage(zone, weightKg, heightCm) {
+  if (!zone) return "";
+  const gap = kgFromIdeal(weightKg, heightCm);
+  if (zone.id === "normal" || gap === 0) return "Estás en tu rango ideal.";
+  const kilos = gap == null ? null : Math.round(Math.abs(gap));
+  const distance = gap == null
+    ? ""
+    : kilos === 0
+      ? (gap > 0 ? "a menos de 1 kg de tu ideal" : "a menos de 1 kg por debajo de tu ideal")
+      : gap > 0
+        ? `a unos ${kilos} kg de tu ideal`
+        : `a unos ${kilos} kg por debajo de tu ideal`;
+  const lead = zone.id === "over" && zone.hint ? "Apenas en sobrepeso" : zone.label;
+  return distance ? `${lead}, ${distance}.` : `${lead}.`;
+}
+
 export function bmiZone(value) {
   if (value == null) return null;
   if (value < 18.5) {
