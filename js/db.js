@@ -7,7 +7,10 @@ const PROFILE_FIELDS = [
   "waist_weekday",
   "onboarding_completed_at",
   "last_reviewed_week_start",
+  "data_reset_version",
 ];
+
+const DATA_RESET_VERSION = 1;
 
 const EMPTY_PROFILE = {
   height_cm: null,
@@ -16,6 +19,7 @@ const EMPTY_PROFILE = {
   waist_weekday: null,
   onboarding_completed_at: null,
   last_reviewed_week_start: null,
+  data_reset_version: DATA_RESET_VERSION,
 };
 
 export function normalizeProfile(row) {
@@ -27,6 +31,7 @@ export function normalizeProfile(row) {
     waist_weekday: row.waist_weekday == null ? null : Number(row.waist_weekday),
     onboarding_completed_at: row.onboarding_completed_at ?? null,
     last_reviewed_week_start: row.last_reviewed_week_start ?? null,
+    data_reset_version: row.data_reset_version == null ? 0 : Number(row.data_reset_version),
   };
 }
 
@@ -63,6 +68,16 @@ export async function createRepository(db, auth) {
     return doc(db, "users", uid, "entries", date);
   }
 
+  async function deleteAllEntries(uid) {
+    const entriesSnap = await getDocs(collection(db, "users", uid, "entries"));
+    const docs = entriesSnap.docs;
+    for (let i = 0; i < docs.length; i += 400) {
+      const batch = writeBatch(db);
+      for (const item of docs.slice(i, i + 400)) batch.delete(item.ref);
+      await batch.commit();
+    }
+  }
+
   return {
     async load() {
       const user = auth.currentUser;
@@ -70,9 +85,15 @@ export async function createRepository(db, auth) {
 
       const profileSnap = await getDoc(profileRef(user.uid));
       let profile = profileSnap.exists() ? profileSnap.data() : null;
-      if (!profile) {
+      if (!profile || Number(profile.data_reset_version) !== DATA_RESET_VERSION) {
+        await deleteAllEntries(user.uid);
         profile = { ...EMPTY_PROFILE };
         await setDoc(profileRef(user.uid), profile);
+        return {
+          user: { id: user.uid, email: user.email || "" },
+          profile: normalizeProfile(profile),
+          entries: [],
+        };
       }
 
       const entriesSnap = await getDocs(collection(db, "users", user.uid, "entries"));
