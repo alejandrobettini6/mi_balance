@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#f4efe6" />
+    <meta
+      name="description"
+      content="Registrá tu peso y tu cintura. El promedio de la semana muestra si bajaste o subiste."
+    />
+    <title>Mi Balance</title>
+    <link rel="stylesheet" href="css/app.css" />
+  </head>
+  <body>
+    <div class="page">
+      <header class="top">
+        <p class="brand">Mi Balance</p>
+        <h1>Peso y cintura</h1>
+        <p class="lede">Anotá el día. El promedio de la semana te dice si bajaste o subiste.</p>
+      </header>
+
+      <section class="panel" aria-labelledby="log-title">
+        <div class="cal-nav">
+          <button type="button" id="prev-month" aria-label="Anterior">‹</button>
+          <h2 id="month-label"></h2>
+          <button type="button" id="next-month" aria-label="Siguiente">›</button>
+        </div>
+        <div id="calendar" class="calendar" role="grid" aria-label="Calendario"></div>
+        <button type="button" class="btn expand" id="toggle-month" aria-expanded="false">
+          Ver mes
+        </button>
+        <p class="selected-day" id="selected-label"></p>
+
+        <form id="day-form">
+          <div class="fields">
+            <label class="field">
+              <span>Peso</span>
+              <div class="measure">
+                <input
+                  id="peso"
+                  name="peso"
+                  inputmode="decimal"
+                  autocomplete="off"
+                  enterkeyhint="next"
+                  maxlength="6"
+                  required
+                />
+                <span>kg</span>
+              </div>
+            </label>
+            <label class="field">
+              <span>Cintura</span>
+              <div class="measure">
+                <input
+                  id="cintura"
+                  name="cintura"
+                  inputmode="decimal"
+                  autocomplete="off"
+                  enterkeyhint="done"
+                  maxlength="6"
+                />
+                <span>cm</span>
+              </div>
+            </label>
+          </div>
+          <p class="form-error" id="form-error" hidden></p>
+          <button type="submit" class="btn primary">Guardar</button>
+        </form>
+      </section>
+
+      <section class="panel averages" id="averages" aria-labelledby="avg-title">
+        <h2 id="avg-title">Promedio de la semana</h2>
+        <p class="week-range" id="week-range"></p>
+        <div class="avg-grid">
+          <article class="avg-card" id="weight-card">
+            <p class="avg-kicker">Peso</p>
+            <p class="avg-value" id="avg-weight">—</p>
+            <p class="avg-unit">kg</p>
+            <p class="trend" id="weight-trend" hidden></p>
+          </article>
+          <article class="avg-card" id="waist-card">
+            <p class="avg-kicker">Cintura</p>
+            <p class="avg-value" id="avg-waist">—</p>
+            <p class="avg-unit">cm</p>
+            <p class="trend" id="waist-trend" hidden></p>
+          </article>
+        </div>
+        <p class="compare" id="compare-text"></p>
+        <p class="day-status" id="day-status"></p>
+        <ul class="week-dots" id="week-dots" aria-label="Días de la semana"></ul>
+      </section>
+
+      <p class="fine">
+        Los registros se guardan en este navegador. Si no hay datos, se cargan tres semanas de
+        demostración.
+      </p>
+      <button type="button" class="btn ghost" id="reset-demo">Restablecer demo</button>
+    </div>
+    <script src="js/app.js"></script>
+  </body>
+</html>
