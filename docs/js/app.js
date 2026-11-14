@@ -1,7 +1,8 @@
 (() => {
   "use strict";
 
-  const STORAGE_KEY = "mi-balance-logs";
+  const STORAGE_KEY = "mi-balance-logs-v2";
+  const LEGACY_STORAGE_KEYS = ["mi-balance-logs"];
   const WEEK_STARTS_ON = 1; // lunes
   const DAY_LETTERS = ["Do", "Lu", "Ma", "Mi", "Ju", "Vi", "Sá"];
   const MONTHS = [
@@ -437,10 +438,19 @@
     render();
   }
 
+  function wantsDemo() {
+    return new URLSearchParams(window.location.search).has("demo");
+  }
+
   function boot() {
+    for (const key of LEGACY_STORAGE_KEYS) localStorage.removeItem(key);
     const stored = loadLogs();
-    state.logs = isEmptyLogs(stored) ? seedLogs() : stored;
-    if (isEmptyLogs(stored)) saveLogs();
+    if (wantsDemo() && isEmptyLogs(stored)) {
+      state.logs = seedLogs();
+      saveLogs();
+    } else {
+      state.logs = stored && !isEmptyLogs(stored) ? stored : {};
+    }
     els.form.addEventListener("submit", saveDay);
     els.calendar.addEventListener("click", (event) => {
       const button = event.target.closest("[data-day]");
@@ -478,8 +488,8 @@
     });
     els.reset.addEventListener("click", () => {
       localStorage.removeItem(STORAGE_KEY);
-      state.logs = seedLogs();
-      saveLogs();
+      for (const key of LEGACY_STORAGE_KEYS) localStorage.removeItem(key);
+      state.logs = {};
       state.selected = todayISO();
       state.viewMonth = startOfMonth(state.selected);
       state.monthOpen = false;
